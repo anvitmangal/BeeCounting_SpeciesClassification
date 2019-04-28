@@ -7,7 +7,7 @@ from functools import partial
 import numpy as np
 import cv2
 import tensorflow as tf
-
+import pandas as pd
 from segmentation import model, dataset, bee_dataset
 from segmentation.results_analysis import find_positions
 from segmentation.results_visualization import plot_positions, plot_segmentation_map
@@ -21,9 +21,10 @@ tf.logging.set_verbosity(tf.logging.INFO)
 def predict_data_generator():
     # Here load your 2D image data in the format uint8 (values between 0 and 255)
     # example :
-    # for my_image_path in my_images_paths:
-    #     yield cv2.imread(my_image_path, cv2.IMREAD_GRAYSCALE)
-    raise NotImplementedError()
+    for my_image_path in os.listdir('dataset'):
+        if(my_image_path[-3:]=='jpg'):
+            yield cv2.imread('dataset/'+my_image_path, cv2.IMREAD_GRAYSCALE)
+    # raise NotImplementedError()
 
 
 if __name__ == '__main__':
@@ -64,7 +65,10 @@ if __name__ == '__main__':
                                                      mode=tf.estimator.ModeKeys.PREDICT))
 
     drawing_functions = bee_dataset.get_object_drawing_functions()
-
+    df=pd.DataFrame()
+    filenames=[]
+    segarea=[]
+    prednums=[]
     for index, prediction in enumerate(predictions):
 
         input_image = prediction['input_data']
@@ -75,7 +79,12 @@ if __name__ == '__main__':
 
         input_image = np.uint8(np.squeeze(input_image) * 255)
         input_image = cv2.cvtColor(input_image, cv2.COLOR_GRAY2BGR)
-
+        xx,yy=np.where(amax>0)
+        seg=xx.shape[0]
+        print(seg)
+        in_size=input_image.shape
+        segarea.append(seg/(in_size[0]*in_size[1]))
+        filenames.append(index)
         plot_segmentation_map(input_image, amax,
                               os.path.join(output_path, "{}_seg_map.png".format(index)), num_classes=args.num_classes)
 
@@ -85,7 +94,13 @@ if __name__ == '__main__':
             continue
 
         np.savetxt(os.path.join(output_path, "{}_predictions.csv".format(index)), predictions_pos, fmt="%i,%i,%i,%.4f")
-
+        t=os.path.join(output_path, "{}_predictions.csv".format(index))
+        file=pd.read_csv(t)
+        prednums.append(len(file.index)+1)
         plot_positions(input_image, [predictions_pos], [(0, 250, 255)],
                        os.path.join(output_path, "{}_positions.png".format(index)),
                        drawing_params=drawing_functions)
+    df['files']=filenames
+    df['area covered by bees']=segarea
+    df['number of bees']=prednums
+    df.to_csv('predictions.csv')
