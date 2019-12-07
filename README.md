@@ -1,4 +1,4 @@
-IP Winter'19 | Anvit Mangal
+Honeybee Species Classification and Dense Counting
 ================================
 
 Classification Tasks
